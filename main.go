@@ -68,6 +68,10 @@ func main() {
 						gcolor.PrintRed("Error walk...")
 						return err
 					}
+					// Armazenando o path
+					// somente uma simulacao
+					// do mapeamento que
+					// iremos fazer para notify
 					if isDir(path) {
 						DirList[i] = path
 						i++
@@ -87,6 +91,7 @@ func main() {
 	var a int = 1
 	var b int = 93
 	var done = make(chan bool, 1)
+	jobs := make(chan SendFile)
 	var watcherEvent = make(chan string)
 	var eventList = []string{"CREATE", "MODIFY"}
 
@@ -104,6 +109,9 @@ func main() {
 			////////////////////////////////////////
 			// simulacao de
 			// geracao event
+			// Ele pega os paths mapeados e captura
+			// quando ouver alterações
+			// lembrando é uma simulação do notify
 			event := "MODIFY"
 			pathEvent := "/dir1/dir2/"
 			rand.Seed(time.Now().UnixNano())
@@ -118,14 +126,17 @@ func main() {
 			}
 			////////////////////////////////////////
 
+			// colocando o evento no CHANNEL
+			// apos receber no channel o mesmo
+			// sera executando por um Worker
 			watcherEvent <- gconcat.Build(event, ":", pathEvent, "file_", n, ".pdf")
 			<-time.After(time.Second * 5)
 		}
 	}()
 
-	jobs := make(chan SendFile)
-
-	// subindo workers
+	// Aqui esta subindo diversos
+	// workers para executar os
+	// jobs
 	for w := 1; w <= WORKES; w++ {
 		go worker(jobs)
 	}
