@@ -8,3 +8,18 @@ Lembrando que este processo não é tão trivial como aparentemente apresenta se
 Temos alguns desafios que temos que pontuar para que possamos desenvolver.
 
 O objetivo aqui é evoluir o desenvolvimento a medida que vamos descobrindo as melhores formas de implementar em Go o sync.
+
+O main é uma simulação do comportamento que teremos para sincronizar o envio para nuvem, e vamos desenvolver também o processo inverso.
+
+### Simulação 
+
+O que temos é uma simulação do comportamento do que iremos desenvolver, para executar basta rodar o comando abaixo.
+Para isto precisa instalar o Go em [download Go](https://golang.org/dl/)
+
+#### go run 
+
+```go
+
+$ go run --race main.go --path=/your-dir --worker=10
+
+```
