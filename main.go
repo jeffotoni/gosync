@@ -115,32 +115,34 @@ func main() {
 		i := 0
 		for {
 			i++
-			////////////////////////////////////////
-			////////////////////////////////////////
-			////////////////////////////////////////
-			// simulacao de
-			// geracao event
-			// Ele pega os paths mapeados e captura
-			// quando ouver alterações
-			// lembrando é uma simulação do notify
-			event := "MODIFY"
-			pathEvent := "/dir1/dir2/"
-			rand.Seed(time.Now().UnixNano())
-			n := a + rand.Intn(b-a+1)
-			if n%2 == 0 {
-				event = eventList[0]
-			}
+			go func() {
+				////////////////////////////////////////
+				////////////////////////////////////////
+				////////////////////////////////////////
+				// simulacao de
+				// geracao event
+				// Ele pega os paths mapeados e captura
+				// quando ouver alterações
+				// lembrando é uma simulação do notify
+				event := "MODIFY"
+				pathEvent := "/dir1/dir2/"
+				rand.Seed(time.Now().UnixNano())
+				n := a + rand.Intn(b-a+1)
+				if n%2 == 0 {
+					event = eventList[0]
+				}
 
-			dirlist, ok := m.Load(n)
-			if ok {
-				pathEvent = dirlist.(string)
-			}
-			////////////////////////////////////////
+				dirlist, ok := m.Load(n)
+				if ok {
+					pathEvent = dirlist.(string)
+				}
+				////////////////////////////////////////
 
-			// colocando o evento no CHANNEL
-			// apos receber no channel o mesmo
-			// sera executando por um Worker
-			watcherEvent <- gconcat.Build(event, ":", pathEvent, "file_", n, ".pdf")
+				// colocando o evento no CHANNEL
+				// apos receber no channel o mesmo
+				// sera executando por um Worker
+				watcherEvent <- gconcat.Build(event, ":", pathEvent, "file_", n, ".pdf")
+			}()
 
 			if i == WORKES {
 				i = 0
@@ -175,6 +177,15 @@ func main() {
 	<-done
 }
 
+// Aqui onde irá descarregar
+// os channels
+// o que entrar na fila
+// será executado aqui
+// Este Worker está aguardando
+// que a fila seja preenchida
+// o worker foi instanciado
+// no inicio, foi feito
+// dinamicamente
 func worker(jobs <-chan SendFile) {
 	for {
 		select {
@@ -184,6 +195,12 @@ func worker(jobs <-chan SendFile) {
 	}
 }
 
+// Este metodo é responsavel
+// por enviar o arquivo para
+// nuvem, seja bucket aws s3
+// seja space do digitalOcean
+// ou qualquer outro que desejar
+// utilizar.
 func SendFileFile(job SendFile) {
 	gcolor.PrintYellow("SendFile:", job.Path, " -> ", job.TypeEvent)
 	time.Sleep(time.Millisecond * 700)
@@ -194,11 +211,13 @@ func (ir *IntRange) NextRandom(r *rand.Rand) int {
 	return r.Intn(ir.max-ir.min+1) + ir.min
 }
 
+// validando se é diretorio
 func isDir(path string) bool {
 	stat, err := os.Stat(path)
 	return err == nil && stat.IsDir()
 }
 
+// validando se é um arquivo
 func fileExist(name string) bool {
 	if stat, err := os.Stat(name); err == nil && !stat.IsDir() {
 		return true
