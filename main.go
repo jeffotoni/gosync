@@ -11,12 +11,14 @@ package main
 
 import (
 	"flag"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/jeffotoni/gcolor"
+	"github.com/jeffotoni/gconcat"
 )
 
 type SendFile struct {
@@ -24,8 +26,13 @@ type SendFile struct {
 	TypeEvent string
 }
 
+type IntRange struct {
+	min, max int
+}
+
 var (
-	WORKES = 50
+	WORKES  = 50
+	DirList = make(map[int]string)
 )
 
 func main() {
@@ -45,11 +52,44 @@ func main() {
 		return
 	}
 
+	/// mapeamento dos diretorios para notify
+	// este mapeamento é simplesmente uma
+	//  das formas de escutar atraves
+	// de eventos do kernel do S.O
+	// para que possamos caputrar
+	// e saber o que ocorreu nos diretórios
+	go func() {
+		gcolor.PrintCyan("Inicio de mapeamento...")
+		for {
+			i := 0
+			if err := filepath.Walk(*pathFile,
+				func(path string, info os.FileInfo, err error) error {
+					if err != nil {
+						gcolor.PrintRed("Error walk...")
+						return err
+					}
+					if isDir(path) {
+						DirList[i] = path
+						i++
+					}
+					return nil
+
+				}); err != nil {
+				gcolor.PrintRed("Error dir", err.Error())
+			}
+			gcolor.PrintCyan("Fim de mapeamento")
+			<-time.After(time.Hour) // in hour
+		}
+	}()
+
 	////////////////////////////////////////
 	// aqui temos declarações de channels
+	var a int = 1
+	var b int = 93
 	var done = make(chan bool, 1)
 	var watcherEvent = make(chan string)
 	var eventList = []string{"CREATE", "MODIFY"}
+
 	// notify será implementado here
 	// Aqui é uma simulação o notify
 	// em 5 em 5 segundos ele lança um evento
@@ -58,30 +98,28 @@ func main() {
 	//  MODIFY -> atulizacao do arquivo
 	go func() {
 		for {
-			watcherEvent <- "CREATE:/dir1/dir2/dir3/file1.pdf"
-			<-time.After(time.Second * 5)
-		}
-	}()
 
-	/// mapeamento dos diretorios para notify
-	go func() {
-		gcolor.PrintCyan("Inicio de mapeamento...")
-		for {
-			if err := filepath.Walk(*pathFile,
-				func(path string, info os.FileInfo, err error) error {
-					if err != nil {
-						gcolor.PrintRed("Error walk...")
-						return err
-					}
-					// mappper here...
-					println("mapper here:", path)
-					return nil
-
-				}); err != nil {
-				gcolor.PrintRed("Error dir", err.Error())
+			////////////////////////////////////////
+			////////////////////////////////////////
+			////////////////////////////////////////
+			// simulacao de
+			// geracao event
+			event := "MODIFY"
+			pathEvent := "/dir1/dir2/"
+			rand.Seed(time.Now().UnixNano())
+			n := a + rand.Intn(b-a+1)
+			if n%2 == 0 {
+				event = eventList[0]
 			}
-			gcolor.PrintCyan("Fim de mapeamento")
-			<-time.After(time.Hour) // in hour
+
+			dirlist, ok := DirList[n]
+			if ok {
+				pathEvent = dirlist
+			}
+			////////////////////////////////////////
+
+			watcherEvent <- gconcat.Build(event, ":", pathEvent, "file_", n, ".pdf")
+			<-time.After(time.Second * 5)
 		}
 	}()
 
@@ -120,6 +158,23 @@ func worker(jobs <-chan SendFile) {
 }
 
 func SendFileFile(job SendFile) {
-	gcolor.PrintYellow("enviando SendFilefile....:", job.Path, " -> ", job.TypeEvent)
+	gcolor.PrintYellow("SendFile:", job.Path, " -> ", job.TypeEvent)
 	time.Sleep(time.Millisecond * 700)
+}
+
+// get Random
+func (ir *IntRange) NextRandom(r *rand.Rand) int {
+	return r.Intn(ir.max-ir.min+1) + ir.min
+}
+
+func isDir(path string) bool {
+	stat, err := os.Stat(path)
+	return err == nil && stat.IsDir()
+}
+
+func fileExist(name string) bool {
+	if stat, err := os.Stat(name); err == nil && !stat.IsDir() {
+		return true
+	}
+	return false
 }
