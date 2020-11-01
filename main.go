@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jeffotoni/gcolor"
@@ -31,8 +32,8 @@ type IntRange struct {
 }
 
 var (
-	WORKES  = 50
-	DirList = make(map[int]string)
+	WORKES = 10
+	m      sync.Map
 )
 
 func main() {
@@ -44,12 +45,17 @@ func main() {
 	// possa ser capturado
 	// e enviado para Nuvem/Bucket etc...
 	pathFile := flag.String("path", "", "nome do arquivo ou diretorio a ser enviado")
+	workerFlag := flag.Int("worker", WORKES, "worker concorrentes")
 	flag.Parse()
 
 	// Path é obrigatório
 	if len(*pathFile) == 0 {
 		flag.PrintDefaults()
 		return
+	}
+
+	if *workerFlag > 0 {
+		WORKES = *workerFlag
 	}
 
 	/// mapeamento dos diretorios para notify
@@ -59,7 +65,7 @@ func main() {
 	// para que possamos caputrar
 	// e saber o que ocorreu nos diretórios
 	go func() {
-		gcolor.PrintCyan("Inicio de mapeamento...")
+		gcolor.PrintCyan("Inicio mapeamento...")
 		for {
 			i := 0
 			if err := filepath.Walk(*pathFile,
@@ -68,12 +74,13 @@ func main() {
 						gcolor.PrintRed("Error walk...")
 						return err
 					}
+
 					// Armazenando o path
 					// somente uma simulacao
 					// do mapeamento que
 					// iremos fazer para notify
 					if isDir(path) {
-						DirList[i] = path
+						m.Store(i, path)
 						i++
 					}
 					return nil
@@ -81,10 +88,13 @@ func main() {
 				}); err != nil {
 				gcolor.PrintRed("Error dir", err.Error())
 			}
-			gcolor.PrintCyan("Fim de mapeamento")
+			gcolor.PrintCyan("Fim mapeamento\n")
 			<-time.After(time.Hour) // in hour
 		}
 	}()
+
+	// aguardando o mapeamento
+	time.Sleep(time.Second * 5)
 
 	////////////////////////////////////////
 	// aqui temos declarações de channels
@@ -102,8 +112,9 @@ func main() {
 	//  CREATE -> arquivos em diretorios
 	//  MODIFY -> atulizacao do arquivo
 	go func() {
+		i := 0
 		for {
-
+			i++
 			////////////////////////////////////////
 			////////////////////////////////////////
 			////////////////////////////////////////
@@ -120,9 +131,9 @@ func main() {
 				event = eventList[0]
 			}
 
-			dirlist, ok := DirList[n]
+			dirlist, ok := m.Load(n)
 			if ok {
-				pathEvent = dirlist
+				pathEvent = dirlist.(string)
 			}
 			////////////////////////////////////////
 
@@ -130,7 +141,12 @@ func main() {
 			// apos receber no channel o mesmo
 			// sera executando por um Worker
 			watcherEvent <- gconcat.Build(event, ":", pathEvent, "file_", n, ".pdf")
-			<-time.After(time.Second * 5)
+
+			if i == WORKES {
+				i = 0
+				time.Sleep(time.Second * 5)
+				println("........................................................................................")
+			}
 		}
 	}()
 
